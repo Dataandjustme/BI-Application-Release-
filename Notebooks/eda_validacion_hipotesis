@@ -1,0 +1,177 @@
+import pandas as pd
+import os
+
+ruta = r"C:\Users\jg436\Downloads\csv"
+
+# Cargar los datasets para validar hipótesis 
+inventarios = pd.read_csv(os.path.join(ruta, "Inventarios .csv"))
+margenes    = pd.read_csv(os.path.join(ruta, "Margenes.csv"))
+costos      = pd.read_csv(os.path.join(ruta, "Costos.csv"))  # opcional
+
+#Audición de los datos 
+
+# Inventarios
+print("INVENTARIOS")
+print(inventarios.shape)
+print(inventarios.columns)
+print(inventarios.dtypes)
+print(inventarios.info())
+print(inventarios.head())
+
+
+# Márgenes
+print("MARGENES")
+print(margenes.shape)
+print(margenes.columns)
+print(margenes.dtypes)
+print(margenes.info())
+print(margenes.head())
+
+
+# Costos
+print("COSTOS")
+print(costos.shape)
+print(costos.columns)
+print(costos.dtypes)
+print(costos.info())
+print(costos.head())
+
+
+
+# Convertir fechas a datetime donde existan
+inventarios['Fecha'] = pd.to_datetime(inventarios['Fecha'], errors='coerce')
+margenes['Fecha']    = pd.to_datetime(margenes['Fecha'], errors='coerce')
+
+#Análisis univariate para la hipótesis 1 demanda y mercado 
+
+# Distribución de litros vendidos por presentación
+print(inventarios.groupby("Producto")["LitrosVendidos"].sum().sort_values(ascending=False))
+
+#Análisis multivariate para observar como se ve la demanda de los productos a través del tiempo y confirmar preferencias 
+
+import matplotlib.pyplot as plt
+
+import matplotlib.pyplot as plt
+
+# 1. Agrupar por fecha y producto
+df_grouped = inventarios.groupby(["Fecha","Producto"])["LitrosVendidos"].sum().reset_index()
+
+# 2. Calcular promedio móvil (ventana de 3 periodos)
+df_grouped['litros_ma'] = df_grouped.groupby("Producto")["LitrosVendidos"].transform(lambda x: x.rolling(3).mean())
+
+# 3. Graficar con colores semánticos
+import matplotlib.pyplot as plt
+
+plt.figure(figsize=(10,6))
+colors = {"Guacamole":"blue","Salsa roja":"red","Salsa verde":"green"}
+
+for producto in df_grouped['Producto'].unique():
+    subset = df_grouped[df_grouped['Producto'] == producto]
+    plt.plot(subset['Fecha'], subset['litros_ma'], 
+             label=producto, color=colors.get(producto,"gray"))
+
+plt.title("Tendencia de litros vendidos por producto (promedio móvil)")
+plt.xlabel("Fecha")
+plt.ylabel("Litros vendidos")
+plt.legend()
+plt.grid(True)
+plt.show()
+
+
+#Análisis multivariate para la hipótesis 2 precio y elasticiad 
+
+resumen = margenes.pivot_table(
+    index=["Producto","Presentacion"],
+    values=["Margen bruto","Margen Pct"],
+    aggfunc="mean"
+)
+print(resumen)
+
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+# Revisar valores únicos para confirmar productos y presentaciones
+print(margenes['Producto'].unique())
+print(margenes['Presentacion'].unique())
+
+plt.figure(figsize=(10,6))
+sns.barplot(
+    data=margenes, 
+    x="Presentacion", 
+    y="Margen Pct", 
+    hue="Producto", 
+    palette={"Guacamole":"green","Salsa Roja":"red","Salsa Verde":"blue"}
+)
+plt.title("Margen % por producto y presentación")
+plt.xlabel("Presentación (Litros)")
+plt.ylabel("Margen %")
+plt.legend()
+plt.show()
+
+# Análisis multivariate para la hipótesis 3 
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+# Agrupar por mes y producto
+df_grouped = inventarios.groupby([inventarios['Fecha'].dt.to_period("M"), "Producto"])["LitrosVendidos"].sum().reset_index()
+df_grouped['Fecha'] = df_grouped['Fecha'].astype(str)  # convertir Period a string para graficar
+
+plt.figure(figsize=(12,6))
+sns.lineplot(data=df_grouped, x="Fecha", y="LitrosVendidos", hue="Producto", marker="o")
+plt.title("Ventas mensuales por producto")
+plt.xlabel("Mes")
+plt.ylabel("Litros vendidos")
+plt.xticks(rotation=45)
+plt.legend()
+plt.grid(True)
+plt.show()
+
+#Análisis Multivariate para la hipótesis 4 patrones de compra por segmentación 
+
+resumen_segmentos = margenes.groupby(["Producto","Presentacion"]).agg({
+    "IngresoTotal":"sum",
+    "Margen Pct":"mean"
+}).reset_index()
+print(resumen_segmentos)
+
+#Análisis Multivariate para la hipotésis 5 comparación de los costos e ingresos 
+
+resumen_costos = margenes.groupby(["Producto","Presentacion"]).agg({
+    "CostoTotal":"sum",
+    "IngresoTotal":"sum",
+    "Margen bruto":"sum",
+    "Margen Pct":"mean"
+}).reset_index()
+print(resumen_costos)
+
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+resumen_melt = resumen_costos.melt(
+    id_vars=["Producto","Presentacion"],
+    value_vars=["CostoTotal","IngresoTotal"],
+    var_name="tipo",
+    value_name="valor"
+)
+
+plt.figure(figsize=(12,6))
+sns.barplot(data=resumen_melt, x="Presentacion", y="valor", hue="tipo")
+plt.title("Comparación de costos e ingresos por presentación")
+plt.xlabel("Presentación (Litros)")
+plt.ylabel("Valor total")
+plt.legend()
+plt.show()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
